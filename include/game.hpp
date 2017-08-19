@@ -1,8 +1,10 @@
 #pragma once
 
 #include "boost/variant.hpp"
+#include "boost/optional.hpp"
 #include "boost/signals2/signal.hpp"
 #include "utils.hpp"
+#include "ncurses.h"
 #include <vector>
 #include <functional>
 #include <unordered_map>
@@ -31,16 +33,34 @@ struct Board;
 
 using Board_positions = std::vector<Board_position>;
 
-struct Piece {
+class Piece_position {
+public:
+  explicit Piece_position(Board_position const);
+
+  int x() const;
+  int y() const;
+  Board_position value() const;
+
+  void move(Board_position const);
+  bool was_changed() const;
+
+private:
+  Board_position value_;
+  bool was_changed_ = false;
+};
+
+class Piece {
   Piece_kind kind;
-  Board_position position;
+  Piece_position position;
   Piece_color color;
-  
+
   int x() const;
   int y() const;
 
-  Board_positions possible_jump_positions(Board const&) const;
-  char character_representation() const;
+  void move(Board_position const);
+  bool was_moved() const;
+
+  Board_positions possible_jump_positions(Board const&) const; 
 };
 
 class Board {
@@ -50,14 +70,32 @@ public:
   static constexpr auto width = 8;
 
   static constexpr auto height = 8;
-
+  
   void for_each_piece(std::function<void(Piece)> const&) const;
 
 private:
-  explicit Board(std::vector<Piece>);
+  Board();
 
   std::vector<Piece> pieces_;
 };
+
+using Board = std::vector<Piece>;
+using Source_piece = Board::iterator;
+using Target_piece = Board::iterator;
+
+
+struct Player_move {
+  Board_position source_position;
+  Board_position target_position;
+
+  void pull(Board&) const;
+  Source_piece source_piece(Board&) const;
+  boost::optional<Target_piece> target_piece(Board&) const;
+};
+
+// TODO Compile
+// Where do we get the Player_move struct from?
+// Write Input and Visual
 
 namespace Input { 
 
@@ -80,7 +118,7 @@ private:
   Board_position position_;
 };
 
-using Key = int;
+using Key = chtype;
 
 class Handler {
 private:

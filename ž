@@ -22,6 +22,9 @@ public:
   Scoped_curses(Scoped_curses&&) =delete;
   Scoped_curses& operator=(Scoped_curses const&) =delete;
   Scoped_curses& operator=(Scoped_curses&&) =delete;
+
+private:
+  static void initialize_color_pairs();
 };
 
 using Color = int;
@@ -31,13 +34,9 @@ struct Color_pair {
   Color background;
 };
 
-bool operator==(Color_pair const, Color_pair const);
-
-}
-
 template <>
-struct std::hash<Chess::Visual::Color_pair> {
-  std::size_t operator()(Chess::Visual::Color_pair const color_pair) const
+struct std::hash<Color_pair> {
+  std::size_t operator()(Color_pair const color_pair)
   {
     std::size_t seed = 0;
     boost::hash_combine(seed, color_pair.foreground);
@@ -45,8 +44,6 @@ struct std::hash<Chess::Visual::Color_pair> {
     return seed;
   }
 };
-
-namespace Chess::Visual {
 
 class Colors {
 public:
@@ -59,7 +56,7 @@ private:
   void init_color_pair(Color_pair const);
 
   std::unordered_map<Color_pair, Color_id> color_ids_;
-  Color_id new_color_id_ = 1;
+  Color_id new_color_id_ = 0;
 };
 
 using Screen_position = utils::Position;
@@ -74,6 +71,11 @@ private:
   static constexpr auto field_width = 4;
   static constexpr auto field_height = 2;
   
+  void draw_pieces();
+  void draw_piece(Game::Piece const);
+  Color piece_color(Game::Piece const);
+  bool piece_is_selected(Game::Piece const) const;
+
   void draw_tiles();
   void draw_tile(Screen_position const);
   bool tile_is_selected(Screen_position const) const;

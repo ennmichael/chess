@@ -1,38 +1,87 @@
 #include "game.hpp"
 #include "utils.hpp"
-#include "ncurses.h"
 #include <algorithm>
 #include <utility>
 
 namespace Chess::Game {
 
+Piece_position::Piece_position(Board_position const pos)
+  : value_(pos)
+{}
+
+int Piece_position::x() const
+{
+  return value_.x;
+}
+
+int Piece_position::y() const
+{
+  return value_.y;
+}
+
+void Piece_position::move(Board_position const new_pos)
+{
+  was_changed_ = true;
+  value_ = new_pos;
+}
+
+bool Piece_position::was_changed() const
+{
+  return was_changed_;
+}
+
 int Piece::x() const
 {
-  return position.x;
+  return position.x();
 }
 
 int Piece::y() const
 {
-  return position.y;
+  return position.y();
 }
 
-char Piece::character_representation() const
+Board_position Piece::value() const
 {
-  return utils::visit_variant<char>(kind,
-    [](Piece_kinds::Pawn const)
+  return value_;
+}
+
+void Piece::move(Board_position const new_pos)
+{
+  position.move(new_pos);
+}
+
+bool Piece::was_moved() const
+{
+  return position.was_changed();
+}
+
+Board_positions Piece::possible_jump_positions(Board const& board) const
+{
+  return utils::visit_variant(
+    kind,
+    [&](Piece_kinds::Pawn const)
     {
-      return 'P';
+      return utils::visit_variant(color,
+        [](Piece_colors::Red const) -> Board_positions
+        {
+          return {position.value() + Board_position{0, 1}};
+        },
+        [](Piece_colors::Blue const) -> Board_positions
+        {
+          return {position.value() + Board_position{0, -1}};
+        }
+      );
     },
-    [](Piece_kinds::Bishop const)
+    [&](Piece_kinds::Bishop const) -> Board_positions
     {
-      return 'B';
+      return {};
     }
   );
 }
 
 Board Board::default_ordered()
 {
-  return Board({}); // TODO
+  return Board();
 }
 
 void Board::for_each_piece(std::function<void(Piece)> const& fun) const 
@@ -40,9 +89,41 @@ void Board::for_each_piece(std::function<void(Piece)> const& fun) const
   std::for_each(pieces_.cbegin(), pieces_.cend(), fun);
 }
 
-Board::Board(std::vector<Piece> pieces)
-  : pieces_(std::move(pieces))
-{}
+Board::Board()
+{
+  // TODO
+}
+
+void Player_move::pull(Board& board) const
+{
+  if (target = target_piece(); target)
+    board.erase(target);
+  source_piece()->move(target_position);
+}
+
+Source_piece Player_move::source_piece(Board& board) const
+{
+  return std::find_if(board.begin(), board.end(), 
+    [&](auto const& piece)
+    {
+      return piece.position.value() == source_position;
+    }
+  );
+}
+
+boost::optional<Target_piece> Player_move::target_piece(Board& board) const
+{
+  auto const found = std::find_if(board.begin(), board.end(), 
+    [](auto const& piece)
+    {
+      return piece.position.value() == target_position;
+    }
+  );
+
+  if (found == board.end())
+    return boost::none;
+  return found;
+}
 
 namespace Input {
 
@@ -60,12 +141,12 @@ Board_position Field_selection::position() const
 
 int Field_selection::x() const
 {
-  return position().x();
+  return position_.x;
 }
 
 int Field_selection::y() const
 {
-  return position().y();
+  return position_.y;
 }
 
 void Field_selection::move_left()
@@ -89,7 +170,7 @@ void Field_selection::move_up()
 void Field_selection::move_down()
 {
   if (position_.y < Board::height-1)
-    ++position.y;
+    ++position_.y;
 }
 
 Field_selection::Field_selection(Board_position position)
@@ -99,7 +180,7 @@ Field_selection::Field_selection(Board_position position)
 Handler Handler::for_field_selection(Field_selection& selection)
 {
   Handler handler;
-  handler.on_key();
+  // TODO
   return handler;
 }
 

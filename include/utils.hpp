@@ -3,12 +3,35 @@
 #include "boost/variant.hpp"
 #include <utility>
 
+// TODO Simplify make_visitor
+
 namespace Chess::utils {
 
 struct Position {
   int x;
   int y;
+  
+  Position translated(Position offset) const
+  {
+    return Position{
+      x + offset.x,
+      y + offset.y
+    };
+  }
 };
+
+inline bool operator==(Position const lhs, Position const rhs)
+{
+  return lhs.x == rhs.x && lhs.y == rhs.y;
+}
+
+inline Position operator-(Position const lhs, Position const rhs)
+{
+  return Position {
+    lhs.x - rhs.x,
+    lhs.y - rhs.y
+  };
+}
 
 template <class ResultType, class Lambda, class... Lambdas>
 struct Made_visitor: Lambda, Made_visitor<ResultType, Lambdas...> {
@@ -47,21 +70,6 @@ ResultType visit_variant(Variant& variant, Lambdas&&... lambdas)
   return boost::apply_visitor(
     make_visitor<ResultType>(std::forward<Lambdas>(lambdas)...),
     variant
-  );
-}
-
-template <class QueriedType, class Variant>
-bool variant_contains(Variant const& variant)
-{
-  return visit_variant(variant, 
-    [](QueriedType const&)
-    {
-      return true;
-    },
-    [](auto const&)
-    {
-      return false;
-    }
   );
 }
 
