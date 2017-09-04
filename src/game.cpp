@@ -19,6 +19,11 @@ int Piece_position::y() const
   return value_.y;
 }
 
+Board_position Piece_position::value() const
+{
+  return value_;
+}
+
 void Piece_position::move(Board_position const new_pos)
 {
   was_changed_ = true;
@@ -40,11 +45,6 @@ int Piece::y() const
   return position.y();
 }
 
-Board_position Piece::value() const
-{
-  return value_;
-}
-
 void Piece::move(Board_position const new_pos)
 {
   position.move(new_pos);
@@ -57,16 +57,16 @@ bool Piece::was_moved() const
 
 Board_positions Piece::possible_jump_positions(Board const& board) const
 {
-  return utils::visit_variant(
+  return utils::visit_variant<Board_positions>(
     kind,
     [&](Piece_kinds::Pawn const)
     {
-      return utils::visit_variant(color,
-        [](Piece_colors::Red const) -> Board_positions
+      return utils::visit_variant<Board_positions>(color,
+        [&](Piece_colors::Red const) -> Board_positions
         {
           return {position.value() + Board_position{0, 1}};
         },
-        [](Piece_colors::Blue const) -> Board_positions
+        [&](Piece_colors::Blue const) -> Board_positions
         {
           return {position.value() + Board_position{0, -1}};
         }
@@ -79,58 +79,44 @@ Board_positions Piece::possible_jump_positions(Board const& board) const
   );
 }
 
-Board Board::default_ordered()
+Board default_ordered_board()
 {
-  return Board();
+  return {}; // TODO
 }
 
-void Board::for_each_piece(std::function<void(Piece)> const& fun) const 
+void Keyboard_signals::connect(Key const key, Callback const& callback)
 {
-  std::for_each(pieces_.cbegin(), pieces_.cend(), fun);
+  signals_[key].connect(callback);
 }
 
-Board::Board()
+void Keyboard_signals::dispatch_key(Key const key) const
 {
-  // TODO
+  if (signals_.count(key))
+    signals_.at(key)();
 }
 
-void Player_move::pull(Board& board) const
+void Keyboard_signals::dispatch_input() const
 {
-  if (target = target_piece(); target)
-    board.erase(target);
-  source_piece()->move(target_position);
+  auto const key = getch();
+  dispatch_key(key);
 }
 
-Source_piece Player_move::source_piece(Board& board) const
+void Player_move::pull(Board&)
 {
-  return std::find_if(board.begin(), board.end(), 
-    [&](auto const& piece)
-    {
-      return piece.position.value() == source_position;
-    }
-  );
+  // TODO actually move
+  source_piece_ = boost::none;
+  target_position_ = boost::none;
 }
 
-boost::optional<Target_piece> Player_move::target_piece(Board& board) const
+bool Player_move::ready() const
 {
-  auto const found = std::find_if(board.begin(), board.end(), 
-    [](auto const& piece)
-    {
-      return piece.position.value() == target_position;
-    }
-  );
-
-  if (found == board.end())
-    return boost::none;
-  return found;
+  return source_piece_ && target_position_;
 }
-
-namespace Input {
 
 Field_selection Field_selection::centered()
 {
   return Field_selection(
-    Board_position{Board::width/2, Board::height/2}
+    Board_position{board_width/2, board_height/2}
   );
 }
 
@@ -149,6 +135,20 @@ int Field_selection::y() const
   return position_.y;
 }
 
+void Field_selection::connect_to_signals(Signals& signals)
+{
+  signals.keyboard.connect(KEY_LEFT,  [this] { move_left(); });
+  signals.keyboard.connect(KEY_RIGHT, [this] { move_right(); });
+  signals.keyboard.connect(KEY_UP,    [this] { move_up(); });
+  signals.keyboard.connect(KEY_DOWN,  [this] { move_down(); });
+  signals.keyboard.connect(KEY_ENTER, 
+    [this, &signals] 
+    {
+      signals.position_selected(position_);
+    }
+  );
+}
+
 void Field_selection::move_left()
 {
   if (position_.x > 0)
@@ -157,7 +157,7 @@ void Field_selection::move_left()
 
 void Field_selection::move_right()
 {
-  if (position_.x < Board::width-1)
+  if (position_.x < board_width-1)
     ++position_.x;
 }
 
@@ -169,7 +169,7 @@ void Field_selection::move_up()
 
 void Field_selection::move_down()
 {
-  if (position_.y < Board::height-1)
+  if (position_.y < board_height-1)
     ++position_.y;
 }
 
@@ -177,41 +177,22 @@ Field_selection::Field_selection(Board_position position)
   : position_(position)
 {}
 
-Handler Handler::for_field_selection(Field_selection& selection)
+Input_loop::Input_loop(Signals const& signals)
+  : signals_(&signals)
+{}
+
+void Input_loop::start()
 {
-  Handler handler;
-  // TODO
-  return handler;
+  running_ = true;
+  while (running_) {
+    signals_->frame_advance();
+    signals_->keyboard.dispatch_input();
+  }
 }
 
-void Handler::on_key(Key const key, Callback const& callback)
+void Input_loop::quit()
 {
-  signals_[key].connect(callback);
-}
-
-void Handler::start_input_loop()
-{
-  input_loop_running_ = true;
-  while (input_loop_running_)
-    dispatch_input();
-}
-
-void Handler::quit_input_loop()
-{
-  input_loop_running_ = false;
-}
-
-void Handler::dispatch_key(Key key)
-{
-  signals_[key]();
-}
-
-void Handler::dispatch_input()
-{
-  auto const key = getch();
-  dispatch_key(key);
-}
-
+  running_ = false;
 }
 
 }

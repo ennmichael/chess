@@ -4,22 +4,36 @@
 
 #include "ncurses.h"
 
-// TODO We can test the input handler, so we should
+// TODO Get this to compile, then think a little about drawing the field
+// selection. Also, connecting Player_move to the Signals
 
 int main()
 {
   Chess::Visual::Scoped_curses scoped_curses;
 
-  auto board = Chess::Game::Board::default_ordered();
-  auto field_selection = Chess::Game::Input::Field_selection::centered();
+  auto board = Chess::Game::default_ordered_board();
+  auto field_selection = Chess::Game::Field_selection::centered();
   Chess::Visual::Board_view view(board, field_selection);
-  view.display();
 
-  Chess::Game::Input::Handler input_handler;
+  Chess::Game::Signals signals;
 
-  input_handler.on_key('q', [&] {
-    input_handler.quit_input_loop();
+  field_selection.connect_to_signals(signals);
+  // TODO ^ Should this be a custom Signals constructor
+
+  Chess::Game::Input_loop input_loop(signals);
+  
+  signals.keyboard.connect('q', [&]
+  {
+    input_loop.quit();
   });
 
-  input_handler.start_input_loop();
+  signals.frame_advance.connect([&]
+  {
+    view.display();
+  });
+
+  input_loop.start();
+
+  return 0;
 }
+

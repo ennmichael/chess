@@ -58,7 +58,7 @@ void Colors::init_color_pair(Color_pair const color_pair)
 
 Board_view::Board_view(
   Game::Board const& board, 
-  Game::Input::Field_selection const& field_selection)
+  Game::Field_selection const& field_selection)
   : board_(&board)
   , field_selection_(&field_selection) 
 {}
@@ -70,58 +70,86 @@ void Board_view::display()
 
 void Board_view::draw_tiles()
 {
-  for (auto x = 0; x < Game::Board::width; ++x)
-    for (auto y = 0; y < Game::Board::height; ++y)
-      draw_tile(upper_left_screen_pos(Game::Board_position{x, y}));
+  for_each_field(
+    [this](Game::Board_position const pos)
+    {
+      draw_tile(translate_to_screen(pos));
+    }
+  );
 }
 
 void Board_view::draw_tile(Screen_position const upper_left_pos)
 {
+  auto const color = tile_color();
   auto const [x, y] = upper_left_pos;
-  auto const white_on_black = colors_.color_for_pair(
-    Color_pair{COLOR_WHITE, COLOR_BLACK}
-  );
 
   auto const draw_corners = [&] 
   {
-    mvaddch_colored(y,   x,   ACS_PLUS, white_on_black);
-    mvaddch_colored(y+2, x,   ACS_PLUS, white_on_black);
-    mvaddch_colored(y,   x+4, ACS_PLUS, white_on_black);
-    mvaddch_colored(y+2, x+4, ACS_PLUS, white_on_black);
+    mvaddch_colored(y,   x,   ACS_PLUS, color);
+    mvaddch_colored(y+2, x,   ACS_PLUS, color);
+    mvaddch_colored(y,   x+4, ACS_PLUS, color);
+    mvaddch_colored(y+2, x+4, ACS_PLUS, color);
   };
 
   auto const draw_frame = [&] 
   {
-    mvaddch_colored(y+1, x,   ACS_VLINE, white_on_black);
-    mvaddch_colored(y+1, x+4, ACS_VLINE, white_on_black);
+    mvaddch_colored(y+1, x,   ACS_VLINE, color);
+    mvaddch_colored(y+1, x+4, ACS_VLINE, color);
 
-    mvaddch_colored(y,   x+2, ACS_HLINE, white_on_black);
-    mvaddch_colored(y,   x+3, ACS_HLINE, white_on_black);
-    mvaddch_colored(y,   x+1, ACS_HLINE, white_on_black);
-    mvaddch_colored(y+2, x+2, ACS_HLINE, white_on_black);
-    mvaddch_colored(y+2, x+3, ACS_HLINE, white_on_black);
-    mvaddch_colored(y+2, x+1, ACS_HLINE, white_on_black);
+    mvaddch_colored(y,   x+2, ACS_HLINE, color);
+    mvaddch_colored(y,   x+3, ACS_HLINE, color);
+    mvaddch_colored(y,   x+1, ACS_HLINE, color);
+    mvaddch_colored(y+2, x+2, ACS_HLINE, color);
+    mvaddch_colored(y+2, x+3, ACS_HLINE, color);
+    mvaddch_colored(y+2, x+1, ACS_HLINE, color);
   };
   
   draw_corners();
   draw_frame();
 }
 
-Screen_position Board_view::upper_left_screen_pos(
-  Game::Board_position const board_pos)
+Color Board_view::tile_color()
 {
-  return Screen_position{
-    board_pos.x * field_width, 
-    board_pos.y * field_height
-  };
+  return colors_.color_for_pair({COLOR_WHITE, COLOR_BLACK});
 }
 
-Game::Board_position Board_view::board_position(
+void Board_view::draw_pieces()
+{
+  /*for_each_field(
+    [](Game::Board_position const pos)
+    {
+      if ()
+    }
+  )
+  for (auto const piece : *board_)
+    draw_piece(piece);*/
+}
+
+void Board_view::draw_piece(Game::Piece const)
+{
+
+}
+
+bool Board_view::field_is_selected(Game::Board_position const pos) const 
+{
+  return field_selection_->position() == pos;
+}
+
+Game::Board_position Board_view::translate_to_board(
   Screen_position const upper_left_pos)
 {
   return Game::Board_position{
     upper_left_pos.x/field_width,
     upper_left_pos.y/field_height
+  };
+}
+
+Screen_position Board_view::translate_to_screen(
+  Game::Board_position const board_pos)
+{
+  return Screen_position{
+    board_pos.x * field_width, 
+    board_pos.y * field_height
   };
 }
 

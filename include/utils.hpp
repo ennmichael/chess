@@ -10,14 +10,6 @@ namespace Chess::utils {
 struct Position {
   int x;
   int y;
-  
-  Position translated(Position offset) const
-  {
-    return Position{
-      x + offset.x,
-      y + offset.y
-    };
-  }
 };
 
 inline bool operator==(Position const lhs, Position const rhs)
@@ -30,6 +22,14 @@ inline Position operator-(Position const lhs, Position const rhs)
   return Position {
     lhs.x - rhs.x,
     lhs.y - rhs.y
+  };
+}
+
+inline Position operator+(Position const lhs, Position const rhs)
+{
+  return Position{
+    lhs.x + rhs.x,
+    lhs.y + rhs.y
   };
 }
 

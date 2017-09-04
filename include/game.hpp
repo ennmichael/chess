@@ -29,8 +29,6 @@ namespace Piece_kinds {
 using Piece_kind = boost::variant<Piece_kinds::Pawn,
                                   Piece_kinds::Bishop>;
 
-struct Board;
-
 using Board_positions = std::vector<Board_position>;
 
 class Piece_position {
@@ -49,7 +47,21 @@ private:
   bool was_changed_ = false;
 };
 
-class Piece {
+struct Piece;
+
+auto constexpr board_width = 8;
+auto constexpr board_height = 8;
+
+template <class T, std::size_t W, std::size_t H>
+using Matrix = std::array<
+  std::array<T, W>, H
+>;
+
+using Board = Matrix<Piece, board_width, board_height>;
+
+Board default_ordered_board();
+
+struct Piece {
   Piece_kind kind;
   Piece_position position;
   Piece_color color;
@@ -63,41 +75,47 @@ class Piece {
   Board_positions possible_jump_positions(Board const&) const; 
 };
 
-class Board {
-public:
-  static Board default_ordered();
-  
-  static constexpr auto width = 8;
+using Key = chtype;
 
-  static constexpr auto height = 8;
-  
-  void for_each_piece(std::function<void(Piece)> const&) const;
+class Keyboard_signals {
+private:
+  using Callback_signature = void();
+
+public:
+  using Callback = std::function<Callback_signature>;
+
+  void connect(Key const, Callback const&);
+  void dispatch_key(Key const) const;
+  void dispatch_input() const;
 
 private:
-  Board();
+  using Signal = boost::signals2::signal<Callback_signature>;
 
-  std::vector<Piece> pieces_;
+  std::unordered_map<Key, Signal> signals_;
 };
 
-using Board = std::vector<Piece>;
 using Source_piece = Board::iterator;
-using Target_piece = Board::iterator;
+using Target_position = Board_position;
 
+class Player_move {
+public:
+  void pull(Board&);
+  bool ready() const;
 
-struct Player_move {
-  Board_position source_position;
-  Board_position target_position;
-
-  void pull(Board&) const;
-  Source_piece source_piece(Board&) const;
-  boost::optional<Target_piece> target_piece(Board&) const;
+private:
+  boost::optional<Source_piece> source_piece_;
+  boost::optional<Target_position> target_position_;
 };
 
-// TODO Compile
-// Where do we get the Player_move struct from?
-// Write Input and Visual
-
-namespace Input { 
+struct Signals {
+  Keyboard_signals keyboard;
+  boost::signals2::signal<void(Board_position)> position_selected;
+  boost::signals2::signal<void(Player_move)> player_decided;
+  boost::signals2::signal<void()> frame_advance;
+  // TODO The frame_advance signal is technically redundant
+  // because redrawing can be done only when needed anyways.
+  // So it should be replaced
+};
 
 class Field_selection {
 public:
@@ -107,43 +125,30 @@ public:
   int x() const;
   int y() const;
 
+  void connect_to_signals(Signals&);
+
+private:
+  explicit Field_selection(Board_position);
+
   void move_left();
   void move_right();
   void move_up();
   void move_down();
 
-private:
-  explicit Field_selection(Board_position);
-
   Board_position position_;
 };
 
-using Key = chtype;
-
-class Handler {
-private:
-  using Callback_signature = void();
-
+class Input_loop {
 public:
-  using Callback = std::function<Callback_signature>;
-  
-  static Handler for_field_selection(Field_selection&);
+  explicit Input_loop(Signals const&);
 
-  void on_key(Key const, Callback const&);
-  void start_input_loop();
-  void quit_input_loop();
+  void start();
+  void quit();
 
 private:
-  using Signal = boost::signals2::signal<Callback_signature>;
-
-  void dispatch_key(Key);
-  void dispatch_input();
-
-  std::unordered_map<Key, Signal> signals_;
-  bool input_loop_running_ = false;
+  Signals const* signals_;
+  bool running_ = false;
 };
-
-}
 
 }
 

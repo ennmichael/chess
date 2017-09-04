@@ -31,7 +31,7 @@ struct Color_pair {
   Color background;
 };
 
-bool operator==(Color_pair const, Color_pair const);
+bool operator==(Color_pair const p1, Color_pair const p2);
 
 }
 
@@ -66,7 +66,7 @@ using Screen_position = utils::Position;
 
 class Board_view { // TODO Rename into Game_view
 public:
-  explicit Board_view(Game::Board const&, Game::Input::Field_selection const&);
+  explicit Board_view(Game::Board const&, Game::Field_selection const&);
 
   void display();
 
@@ -74,15 +74,28 @@ private:
   static constexpr auto field_width = 4;
   static constexpr auto field_height = 2;
   
+  template <class F>
+  void for_each_field(F&& f)
+  {
+    for (auto x = 0; x < Game::board_width; ++x)
+      for (auto y = 0; y < Game::board_height; ++y)
+        f(Game::Board_position{x, y});
+  }
+
   void draw_tiles();
   void draw_tile(Screen_position const);
-  bool tile_is_selected(Screen_position const) const;
+  Color tile_background_color(Screen_position const) const;
+  Color tile_color();
   
-  static Screen_position upper_left_screen_pos(Game::Board_position const);
-  static Game::Board_position board_position(Screen_position const);
-  
+  void draw_pieces();
+  void draw_piece(Game::Piece const);
+  bool field_is_selected(Game::Board_position const) const;
+
+  static Game::Board_position translate_to_board(Screen_position const);
+  static Screen_position translate_to_screen(Game::Board_position const);
+
   Game::Board const* board_;
-  Game::Input::Field_selection const* field_selection_;
+  Game::Field_selection const* field_selection_;
   Colors colors_;
 };
 
