@@ -77,8 +77,8 @@ private:
   template <class F>
   void for_each_field(F&& f)
   {
-    for (auto x = 0; x < Game::board_width; ++x)
-      for (auto y = 0; y < Game::board_height; ++y)
+    for (auto x = 0; x < Game::Board::width; ++x)
+      for (auto y = 0; y < Game::Board::height; ++y)
         f(Game::Board_position{x, y});
   }
 

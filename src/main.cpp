@@ -4,14 +4,11 @@
 
 #include "ncurses.h"
 
-// TODO Get this to compile, then think a little about drawing the field
-// selection. Also, connecting Player_move to the Signals
-
 int main()
 {
   Chess::Visual::Scoped_curses scoped_curses;
 
-  auto board = Chess::Game::default_ordered_board();
+  auto board = Chess::Game::Board::default_ordered();
   auto field_selection = Chess::Game::Field_selection::centered();
   Chess::Visual::Board_view view(board, field_selection);
 

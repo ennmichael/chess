@@ -35,16 +35,6 @@ bool Piece_position::was_changed() const
   return was_changed_;
 }
 
-int Piece::x() const
-{
-  return position.x();
-}
-
-int Piece::y() const
-{
-  return position.y();
-}
-
 void Piece::move(Board_position const new_pos)
 {
   position.move(new_pos);
@@ -79,9 +69,32 @@ Board_positions Piece::possible_jump_positions(Board const& board) const
   );
 }
 
-Board default_ordered_board()
+Board Board::default_ordered()
 {
-  return {}; // TODO
+  return Board();
+}
+
+void Board::iterate_fields(
+  Field_iteration_callback const callback) const
+{
+  for (auto x = 0; x < Board::width; ++x) {
+    for (auto y = 0; y < Board::height; ++y) {
+      const Board_position pos{x, y};
+      callback(piece_at_position(pos), pos);
+    }
+  }
+  // TODO Not DRY, we're repeating the nested for loop
+}
+
+boost::optional<Piece> Board::piece_at_position(
+  Board_position const pos) const
+{
+  return utils::optionalized::find_if(pieces,
+    [pos](auto const piece) 
+    {
+      return piece.position.value() == pos;
+    }
+  );
 }
 
 void Keyboard_signals::connect(Key const key, Callback const& callback)
@@ -116,7 +129,7 @@ bool Player_move::ready() const
 Field_selection Field_selection::centered()
 {
   return Field_selection(
-    Board_position{board_width/2, board_height/2}
+    Board_position{Board::width/2, Board::height/2}
   );
 }
 
@@ -157,7 +170,7 @@ void Field_selection::move_left()
 
 void Field_selection::move_right()
 {
-  if (position_.x < board_width-1)
+  if (position_.x < Board::width-1)
     ++position_.x;
 }
 
@@ -169,7 +182,7 @@ void Field_selection::move_up()
 
 void Field_selection::move_down()
 {
-  if (position_.y < board_height-1)
+  if (position_.y < Board::height-1)
     ++position_.y;
 }
 

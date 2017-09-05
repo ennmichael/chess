@@ -73,5 +73,18 @@ ResultType visit_variant(Variant& variant, Lambdas&&... lambdas)
   );
 }
 
+namespace optionalized {
+
+template <class Container, class Pred>
+auto find_if(Container& c, Pred pred)
+  -> boost::optional<typename Container::value_type>
+{
+  const auto i = std::find_if(c.begin(), c.end(), pred);
+  if (i == c.end())
+    return boost::none;
+  return *i;
 }
 
+}
+
+}

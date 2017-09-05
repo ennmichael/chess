@@ -47,32 +47,33 @@ private:
   bool was_changed_ = false;
 };
 
-struct Piece;
-
-auto constexpr board_width = 8;
-auto constexpr board_height = 8;
-
-template <class T, std::size_t W, std::size_t H>
-using Matrix = std::array<
-  std::array<T, W>, H
->;
-
-using Board = Matrix<Piece, board_width, board_height>;
-
-Board default_ordered_board();
+struct Board;
 
 struct Piece {
   Piece_kind kind;
   Piece_position position;
   Piece_color color;
 
-  int x() const;
-  int y() const;
-
   void move(Board_position const);
   bool was_moved() const;
 
   Board_positions possible_jump_positions(Board const&) const; 
+};
+
+struct Board {
+  static constexpr auto width = 8;
+  static constexpr auto height = 8;
+
+  static Board default_ordered();
+
+  using Pieces = std::vector<Piece>;
+  using Field_iteration_callback = 
+    std::function<void(boost::optional<Piece>, Board_position)>;
+
+  void iterate_fields(Field_iteration_callback const) const;
+  boost::optional<Piece> piece_at_position(Board_position const) const;
+
+  Pieces pieces;
 };
 
 using Key = chtype;
@@ -94,7 +95,7 @@ private:
   std::unordered_map<Key, Signal> signals_;
 };
 
-using Source_piece = Board::iterator;
+using Source_piece = Board::Pieces::iterator;
 using Target_position = Board_position;
 
 class Player_move {
