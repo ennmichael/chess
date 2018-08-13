@@ -1,36 +1,42 @@
-#include "visual.hpp"
-#include "game.hpp"
-#include "boost/signals2.hpp"
+#include "sdl++.h"
 
-#include "ncurses.h"
+using namespace std::string_literals;
 
-int main()
+namespace {
+
+unsigned constexpr window_width = 500;
+unsigned constexpr window_height = 500;
+
+// Maybe this is Redraw instead of FrameAdvance?
+template <class FrameAdvance, class DispatchKey>
+void main_loop(FrameAdvance const& frame_advance, DispatchKey const& dispatch_key)
 {
-  Chess::Visual::Scoped_curses scoped_curses;
+        auto quit = false;
 
-  auto board = Chess::Game::Board::default_ordered();
-  auto field_selection = Chess::Game::Field_selection::centered();
-  Chess::Visual::Board_view view(board, field_selection);
-
-  Chess::Game::Signals signals;
-
-  field_selection.connect_to_signals(signals);
-  // TODO ^ Should this be a custom Signals constructor
-
-  Chess::Game::Input_loop input_loop(signals);
-  
-  signals.keyboard.connect('q', [&]
-  {
-    input_loop.quit();
-  });
-
-  signals.frame_advance.connect([&]
-  {
-    view.display();
-  });
-
-  input_loop.start();
-
-  return 0;
+        while (!quit) {
+                while (std::optional<Sdl::Event> const event = Sdl::poll_event()) {
+                        switch (event->type) {
+                                case Sdl::Events::quit:
+                                        quit = true;
+                                        break;
+                                case Sdl::Events::key_down:
+                                        dispatch_key(event->keysym->sym);
+                                        break;
+                        }
+                }
+        }
 }
 
+}
+
+int main(int, char**)
+{
+        Sdl::InitGuard _;
+
+        Sdl::UniqueWindow window = Sdl::create_window("chess"s,
+                                                     window_width,
+                                                     window_height);
+        Sdl::UniqueRenderer renderer = Sdl::create_renderer(*window);
+
+        main_loop([] {});
+}
