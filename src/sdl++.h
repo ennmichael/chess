@@ -9,19 +9,23 @@
 
 namespace Sdl {
 
-using Keycode = SDL_Keycode;
+using EventType = SDL_EventType;
 
 namespace Events {
         auto constexpr quit = SDL_QUIT;
         auto constexpr key_down = SDL_KEYDOWN;
 }
 
-// TODO Use scancodes
+using Keycode = SDL_Keycode;
+
 namespace Keycodes {
         auto constexpr left = SDLK_LEFT;
         auto constexpr right = SDLK_RIGHT;
         auto constexpr up = SDLK_UP;
+        auto constexpr down = SDLK_DOWN;
         auto constexpr space = SDLK_SPACE;
+        auto constexpr u = SDLK_u;
+        auto constexpr r = SDLK_r;
 }
 
 using Keyboard = Uint8 const*;

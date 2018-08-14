@@ -1,18 +1,19 @@
 #include "chess.h"
 #include <algorithm>
 #include <cmath>
+#include <cassert>
 
 namespace Chess {
 
 namespace {
 
-// Move this to a utils file if needed
 int normalize(int x)
 {
         return x / std::abs(x);
 }
 
-bool move_is_valid(Rules const& rules, Side on_turn, Board const& board, Move move)
+bool move_is_valid(std::vector<Rule> const& rules, Side on_turn,
+                   Board const& board, Move move)
 {
         return std::any_of(rules.cbegin(), rules.cend(),
                 [&](Rule const& rule)
@@ -20,6 +21,7 @@ bool move_is_valid(Rules const& rules, Side on_turn, Board const& board, Move mo
         );
 }
 
+// Max distance of 0 means there is no distance restriction.
 auto direct_pattern(int max_distance = 0)
 {
         return [max_distance](Board const& board, Move move)
@@ -30,7 +32,7 @@ auto direct_pattern(int max_distance = 0)
                                 for (int i = std::min(a, b);
                                      i < std::max(a, b);
                                      ++i) {
-                                        if (board[move.from.x][i])
+                                        if (board[move.from.x][i] != Piece::none())
                                                 return false;
                                 }
                                 return true;
@@ -48,17 +50,17 @@ auto direct_pattern(int max_distance = 0)
 
 auto diagonal_pattern()
 {
-        return [max_distance](Board const& board, Move move)
+        return [](Board const& board, Move move)
         {
                 auto const [from, to] = move;
                 if (std::abs(from.x - to.x) == std::abs(from.y - to.y)) {
-                        Point pos = from;
+                        Position pos = from;
                         int const dx = normalize(to.x - pos.x);
                         int const dy = normalize(to.y - pos.y);
                         while (pos != to) {
                                 pos.x += dx;
                                 pos.y += dy;
-                                if (board[pos.x][pos.y])
+                                if (board[pos.x][pos.y] != Piece::none())
                                         return false;
                         }
                         return true;
@@ -69,10 +71,10 @@ auto diagonal_pattern()
 
 auto star_pattern()
 {
-        return [max_distance](Board const& board, Move move)
+        return [](Board const& board, Move move)
         {
-                return direct_pattern_pattern()(board, move) ||
-                       diagonal_pattern_pattern()(board, move);
+                return direct_pattern()(board, move) ||
+                       diagonal_pattern()(board, move);
         };
 }
 
@@ -81,10 +83,12 @@ Rule rule(Callback const& callback)
 {
         return [callback](Side on_turn, Board const& board, Move move)
         {
-                std::optional<Piece> src = board[move.from.x][move.from.y];
-                if (!src && src->side == on_turn)
+                if (on_turn == Side::none)
                         return false;
-                std::optional<Piece> dst = board[move.to.x][move.to.y];
+                Piece src = board[move.from.x][move.from.y];
+                if (src.kind == Piece::Kind::none || src.side != on_turn)
+                        return false;
+                Piece dst = board[move.to.x][move.to.y];
                 return callback(src, dst, board, move);
         };
 }
@@ -93,16 +97,22 @@ template <class MovementPattern>
 Rule movement_rule(Piece::Kind piece_kind, MovementPattern pattern)
 {
         return rule(
-                [piece_kind, movement_pattern]
-                (Piece src, std::optional<Piece> dst,
-                 Board const& board, Move move)
+                [piece_kind, pattern](Piece src, Piece dst,
+                                      Board const& board, Move move)
                 {
-                        if (dst && dst->side == src.side)
+                        if (dst.kind != Piece::Kind::none && dst.side == src.side)
                                 return false;
+                        return pattern(board, move);
                 }
         );
 }
 
+}
+
+Side opposite_side(Side side) noexcept
+{
+        assert(side != Side::none);
+        return (side == Side::light) ? Side::dark : Side::light;
 }
 
 bool operator==(Position p1, Position p2) noexcept
@@ -115,46 +125,61 @@ bool operator!=(Position p1, Position p2) noexcept
         return !(p1 == p2);
 }
 
+bool operator==(Piece p1, Piece p2) noexcept
+{
+        return p1.kind == p2.kind && p1.side == p2.side;
+}
+
+bool operator!=(Piece p1, Piece p2) noexcept
+{
+        return !(p1 == p2);
+}
+
 void Move::apply(Board& board) const noexcept
 {
         board[to.x][to.y] = board[from.x][from.y];
-        board[from.x][from.y] = std::nullopt;
+        board[from.x][from.y] = Piece::none();
 }
 
 void Move::reverse(Board& board) const noexcept
 {
-        Move const opposite_move { .from = to, .to = from };
+        Move const opposite_move {.from = to, .to = from};
         opposite_move.apply(board);
 }
 
 Board default_starting_board() noexcept
 {
-        Board board {0};
+        Board board {Piece::none()};
         return board;
 }
 
-void MoveHistory::add(Move move)
+void MoveHistory::add_move(Move move, Board& board)
 {
+        move.apply(board);
         if (last_move_ != moves_.cend())
                 moves_.erase(last_move_, moves_.cend());
         moves_.push_back(move);
         last_move_ = moves_.cend();
 }
 
-void MoveHistory::undo_move(Board& board) const noexcept
+bool MoveHistory::undo_move(Board& board) noexcept
 {
         if (last_move_ != moves_.cbegin()) {
                 --last_move_;
                 last_move_->reverse(board);
+                return true;
         }
+        return false;
 }
 
-void MoveHistory::redo_move(Board& board) const noexcept
+bool MoveHistory::redo_move(Board& board) noexcept
 {
         if (last_move_ != moves_.cend()) {
                 last_move_->apply(board);
                 ++last_move_;
+                return true;
         }
+        return false;
 }
 
 std::vector<Rule> default_rules()
@@ -167,15 +192,46 @@ std::vector<Rule> default_rules()
         };
 }
 
+// TODO
+// Test-run the whole thing
+// Write rules for pawn movement, queen movement, castling, en passant
+
 bool Game::try_move(Move move)
 {
         if (move_is_valid(rules_, on_turn_, board_, move)) {
-                moves_.push_back(move);
-                move.apply(board_);
+                move_history_.add_move(move, board_);
+                toggle_turn();
+                return true;
         }
+        return false;
 }
 
+void Game::undo_move()
+{
+        if (move_history_.undo_move(board_))
+                toggle_turn();
+}
 
+void Game::redo_move()
+{
+        if (move_history_.redo_move(board_))
+                toggle_turn();
+}
+
+Side Game::on_turn() const noexcept
+{
+        return on_turn_;
+}
+
+Board Game::board() const noexcept
+{
+        return board_;
+}
+
+void Game::toggle_turn() noexcept
+{
+        on_turn_ = opposite_side(on_turn_);
+}
 
 }
 

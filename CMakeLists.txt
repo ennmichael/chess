@@ -8,10 +8,10 @@ macro(add_compile_options target)
         target_compile_options(${target} PRIVATE "-O0")
 endmacro()
 
-add_library(chess src/chess.cpp src/sdl++.cpp)
+add_library(chess src/chess.cpp src/sdl++.cpp src/graphics.cpp src/ui.cpp)
 add_compile_options(chess)
-add_executable(chess-exe src/main.cpp)
-add_compile_options(chess-exe)
+add_executable(chess.bin src/main.cpp)
+add_compile_options(chess.bin)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${chess_SOURCE_DIR}/cmake")
 
@@ -31,8 +31,8 @@ target_link_libraries(chess PRIVATE ${SDL2_LIBRARY})
 target_include_directories(chess PRIVATE ${SDL2_IMAGE_INCLUDE_DIR})
 target_link_libraries(chess PRIVATE ${SDL2_IMAGE_LIBRARY})
 target_include_directories(chess PRIVATE "${chess_SOURCE_DIR}/src")
-target_include_directories(chess-exe PRIVATE "${chess_SOURCE_DIR}/src")
-target_link_libraries(chess-exe chess)
+target_include_directories(chess.bin PRIVATE "${chess_SOURCE_DIR}/src")
+target_link_libraries(chess.bin chess)
 
 add_subdirectory(tests)
 
