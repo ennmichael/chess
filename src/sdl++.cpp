@@ -169,5 +169,12 @@ std::optional<Event> poll_event()
         return std::nullopt;
 }
 
+void message_box(std::string const& title, std::string const& message)
+{
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION,
+                                 title.c_str(), message.c_str(),
+                                 nullptr);
+}
+
 }
 

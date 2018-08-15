@@ -105,8 +105,17 @@ private:
         Actions::const_iterator last_action_ = actions_.cend();
 };
 
+struct RulesWrapper;
 using Rule = std::function<bool(Side on_turn, Board const& board,
+                                RulesWrapper rules_wrapper,
                                 MoveHistory const& move_history, Move move)>;
+struct RulesWrapper {
+        RulesWrapper(std::vector<Rule> const& rules)
+                : rules(rules)
+        {}
+
+        std::vector<Rule> const& rules;
+};
 
 Board default_starting_board() noexcept;
 std::vector<Rule> default_rules();
@@ -122,7 +131,6 @@ public:
         void redo_move();
         Side on_turn() const noexcept;
         Board board() const noexcept;
-        Side winner() const noexcept;
 
 private:
         void toggle_turn() noexcept;

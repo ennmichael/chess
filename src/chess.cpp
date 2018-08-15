@@ -22,14 +22,31 @@ int constexpr right_bishop_x = 5;
 int constexpr queen_x = 3;
 int constexpr king_x = 4;
 
-bool move_is_valid(std::vector<Rule> const& rules, Side on_turn,
-                   Board const& board, MoveHistory const& move_history,
-                   Move move)
+// FIXME Have king_movement_rule, other_rules, all()
+bool move_is_valid(Side on_turn, Board const& board,
+                   std::vector<Rule> const& rules,
+                   MoveHistory const& move_history, Move move)
 {
+        auto const rules_without =
+        [&](Rule const& rule)
+        {
+                std::vector<Rule> result = rules;
+                auto const i = std::remove_if(
+                        result.begin(), result.end(),
+                        [&](Rule const& other)
+                        {
+                                return &rule == &other;
+                        }
+                );
+                result.erase(i, result.end());
+                return result;
+        };
+
         return std::any_of(rules.cbegin(), rules.cend(),
                 [&](Rule const& rule)
                 {
-                        return rule(on_turn, board, move_history, move);
+                        return rule(on_turn, board, rules_without(rule),
+                                    move_history, move);
                 }
         );
 }
@@ -107,12 +124,10 @@ auto star_pattern(int max_distance = 0) noexcept
         };
 }
 
-// TODO Refactor: add kind_rule
-
 template <class Callback>
 Rule rule(Callback const& callback)
 {
-        return [callback](Side on_turn, Board const& board,
+        return [callback](Side on_turn, Board const& board, RulesWrapper rules_wrapper,
                           MoveHistory const& move_history, Move move)
         {
                 if (on_turn == Side::none)
@@ -121,33 +136,47 @@ Rule rule(Callback const& callback)
                 if (src.kind == Piece::Kind::none || src.side != on_turn)
                         return false;
                 Piece dst = board[move.to.y][move.to.x];
-                return callback(src, dst, board, move_history, move);
+                return callback(src, dst, board, rules_wrapper.rules, move_history, move);
         };
+}
+
+template <class Callback>
+Rule rule(Piece::Kind kind, Callback const& callback)
+{
+        return rule(
+                [kind, callback](Piece src, Piece dst, Board const& board,
+                                 std::vector<Rule> const& rules,
+                                 MoveHistory const& move_history, Move move)
+                {
+                        return src.kind == kind &&
+                               callback(src, dst, board, rules, move_history, move);
+                }
+        );
 }
 
 template <class MovementPattern>
 Rule movement_rule(Piece::Kind piece_kind, MovementPattern pattern)
 {
         return rule(
-                [piece_kind, pattern](Piece src, Piece dst, Board const& board,
-                                      MoveHistory const&, Move move)
+                piece_kind,
+                [pattern](Piece src, Piece dst, Board const& board,
+                          std::vector<Rule> const&, MoveHistory const&, Move move)
                 {
-                        if (dst.side == src.side || src.kind != piece_kind)
-                                return false;
-                        return pattern(board, move);
+                        return src.side != dst.side && pattern(board, move);
                 }
         );
 }
 
-bool field_under_attack(std::vector<Rule> const& rules,
-                        Board const& board,
-                        Position field_position)
+bool field_is_under_attack(Side side, Board const& board,
+                           std::vector<Rule> const& rules,
+                           MoveHistory const& move_history,
+                           Position field_position)
 {
         for (int x = 0; x < board_size; ++x) {
                 for (int y = 0; y < board_size; ++y) {
                         Position const pos {x, y};
                         Move const move {.from = pos, .to = field_position};
-                        if (move_is_valid(move))
+                        if (move_is_valid(side, board, rules, move_history, move))
                                 return true;
                 }
         }
@@ -156,7 +185,23 @@ bool field_under_attack(std::vector<Rule> const& rules,
 
 Rule king_movement_rule()
 {
-        return movement_rule(Piece::Kind::king, star_pattern(1));
+        return rule(
+                Piece::Kind::king,
+                [](Piece src, Piece dst, Board const& board,
+                   std::vector<Rule> const& rules,
+                   MoveHistory const& move_history, Move move)
+                {
+                        bool different_side = (src.side != dst.side);
+                        bool patten = star_pattern(1)(board, move);
+                        bool under_attack = !field_is_under_attack(src.side, board, rules,
+                                                                   move_history, move.to);
+
+                        return src.side != dst.side &&
+                               star_pattern(1)(board, move) &&
+                               !field_is_under_attack(src.side, board, rules,
+                                                      move_history, move.to);
+                }
+        );
 }
 
 Rule rook_movement_rule()
@@ -177,7 +222,7 @@ Rule bishop_movement_rule()
 Rule pawn_movement_rule()
 {
         return rule(
-                [](Piece src, Piece dst, Board const& board,
+                [](Piece src, Piece dst, Board const& board, std::vector<Rule> const&,
                    MoveHistory const& move_history, Move move)
                 {
                         if (src.kind != Piece::Kind::pawn || dst.side == src.side)
@@ -209,7 +254,8 @@ Rule pawn_movement_rule()
 Rule knight_movement_rule()
 {
         return rule(
-                [](Piece src, Piece dst, Board const&, MoveHistory const&, Move move)
+                [](Piece src, Piece dst, Board const&, std::vector<Rule> const&,
+                   MoveHistory const&, Move move)
                 {
                         if (src.kind != Piece::Kind::knight || dst.side == src.side)
                                 return false;
@@ -245,7 +291,7 @@ Position castling_king_position(Move move) noexcept
 Rule castling_rule()
 {
         return rule(
-                [](Piece src, Piece dst, Board const& board,
+                [](Piece src, Piece dst, Board const& board, std::vector<Rule> const&,
                    MoveHistory const& move_history, Move move)
                 {
                         auto const king_or_rook =
@@ -283,29 +329,30 @@ std::optional<Position> find_piece(Board const& board, Piece piece) noexcept
         for (int x = 0; x < board_size; ++x) {
                 for (int y = 0; y < board_size; ++y) {
                         if (board[y][x] == piece)
-                                return {x, y};
+                                return Position {x, y};
                 }
         }
+        return std::nullopt;
 }
 
 // TODO Refactor: factor out the nested loop, it's bloody annoying
 
-bool piece_trapped(std::vector<Rule> const& rules,
-                   Board const& board,
-                   Position piece_position) noexcept
+bool piece_is_trapped(Side side, Board const& board, std::vector<Rule> const& rules,
+                      MoveHistory const& move_history, Position piece_position) noexcept
 {
         for (int x = 0; x < board_size; ++x) {
                 for (int y = 0; y < board_size; ++y) {
                         Position const pos {x, y};
                         Move const move {.from = piece_position, .to = pos};
-                        if (move_is_valid(move))
+                        if (move_is_valid(side, board, rules, move_history, move))
                                 return false;
                 }
         }
         return true;
 }
 
-Side winner(std::vector<Rule> const& rules, Board const& board) noexcept
+Side winner(Board const& board, std::vector<Rule> const& rules,
+            MoveHistory const& move_history) noexcept
 {
         auto const side_won =
         [&](Side side)
@@ -313,7 +360,9 @@ Side winner(std::vector<Rule> const& rules, Board const& board) noexcept
                 Piece const king {.kind = Piece::Kind::king, .side = side};
                 std::optional king_position = find_piece(board, king);
                 assert(king_position);
-                return piece_trapped(rules, board, *king_position);
+                return field_is_under_attack(side, board, rules,
+                                             move_history, *king_position) &&
+                       piece_is_trapped(side, board, rules, move_history, *king_position);
         };
 
         if (side_won(Side::light))
@@ -574,17 +623,17 @@ Game::Game(GameOver game_over) noexcept
 
 bool Game::try_move(Move move)
 {
-        if (move_is_valid(rules_, on_turn_, board_, move_history_, move)) {
+        if (move_is_valid(on_turn_, board_, rules_, move_history_, move)) {
                 Piece const src = board_[move.from.y][move.from.x];
                 Piece const dst = board_[move.to.y][move.to.x];
                 if (src.side == dst.side)
                         castling(move);
                 else
                         normal_move(move);
-                Side const winner = winner(rules_, board_);
-                if (winner != Side::none) {
+                Side const w = winner(board_, rules_, move_history_);
+                if (w != Side::none) {
                         on_turn_ = Side::none;
-                        game_over_(winner);
+                        game_over_(w);
                 } else {
                         toggle_turn();
                 }
@@ -613,11 +662,6 @@ Side Game::on_turn() const noexcept
 Board Game::board() const noexcept
 {
         return board_;
-}
-
-Side Game::winner() const noexcept
-{
-        return winner_;
 }
 
 void Game::toggle_turn() noexcept

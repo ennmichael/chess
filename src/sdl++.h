@@ -113,9 +113,9 @@ void render_copy(Renderer& Renderer,
 UniqueTexture load_texture(Renderer& Renderer, std::string path);
 Dimensions texture_dimensions(Texture& texture);
 Dimensions renderer_dimensions(Sdl::Renderer& Renderer);
-
 Ticks get_ticks() noexcept;
 std::optional<Event> poll_event();
+void message_box(std::string const& title, std::string const& message);
 
 }
 

@@ -2,14 +2,16 @@
 #include "sdl++.h"
 #include "chess.h"
 #include "graphics.h"
+#include <cassert>
+#include <iostream>
 
 namespace {
 
 unsigned constexpr window_width = Chess::field_width * Chess::board_size;
 unsigned constexpr window_height = Chess::field_height * Chess::board_size;
 
-template <class Signals>
-void main_loop(Signals const& signals)
+template <class Redraw, class KeyDown>
+void main_loop(Redraw const& redraw, KeyDown const& key_down)
 {
         auto quit = false;
         while (!quit) {
@@ -44,9 +46,14 @@ int main(int, char**)
         });
 
         auto const game_over =
-        [](Side winner)
+        [](Chess::Side winner)
         {
-        
+                // FIXME What's up with message boxes?
+                assert(winner != Chess::Side::none);
+                std::string const winner_str = (winner == Chess::Side::light) ?
+                        "Light"s : "Dark"s;
+                Sdl::message_box("Game over"s, winner_str + " won."s);
+                std::cout << (winner_str + " won.\n"s);
         };
 
         Chess::Game game(game_over);
