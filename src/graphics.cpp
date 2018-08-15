@@ -83,15 +83,14 @@ void draw_piece_selector(Sdl::Renderer& renderer, PieceSelector selector, Side o
         if (on_turn == Side::none)
                 return;
 
-        int constexpr alpha = 0x69;
         Sdl::Color constexpr transparent_white {
-                .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = alpha
+                .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = 0x96
         };
         Sdl::Color constexpr transparent_black {
-                .r = 0x00, .g = 0x00, .b = 0x00, .a = alpha
+                .r = 0x00, .g = 0x00, .b = 0x00, .a = 0x69
         };
         Sdl::Color constexpr transparent_red {
-                .r = 0xFF, .g = 0x00, .b = 0x00, .a = alpha
+                .r = 0xFF, .g = 0x00, .b = 0x00, .a = 0x33
         };
 
         auto const draw_current_position = [&]
@@ -115,7 +114,7 @@ void draw_board(Sdl::Renderer& renderer, Sdl::Texture& pieces, Board const& boar
 {
         for (int x = 0; x < board_size; ++x) {
                 for (int y = 0; y < board_size; ++y) {
-                        auto const piece = board[x][y];
+                        auto const piece = board[y][x];
                         Position const pos {x, y};
                         draw_background(renderer, pos);
                         draw_piece(renderer, pieces, piece, pos);

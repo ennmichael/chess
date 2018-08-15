@@ -8,7 +8,6 @@ namespace {
 unsigned constexpr window_width = Chess::field_width * Chess::board_size;
 unsigned constexpr window_height = Chess::field_height * Chess::board_size;
 
-// Maybe this is Redraw instead of FrameAdvance?
 template <class Redraw, class DispatchKey>
 void main_loop(Redraw const& redraw, DispatchKey const& dispatch_key)
 {
@@ -54,6 +53,7 @@ int main(int, char**)
         };
 
         auto const dispatch_key = [&](Sdl::Keycode keycode) {
+                // TODO Cancel selection with ESC
                 switch (keycode) {
                         case Sdl::Keycodes::left:
                                 selector.move_left();

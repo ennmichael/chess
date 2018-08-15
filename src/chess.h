@@ -2,6 +2,15 @@
 
 #include <vector>
 #include <functional>
+#include <variant>
+
+/**
+ * What's left:
+ * Test castling
+ * (this means that .applying a Move when src and dst are on the same side
+ * should swap them - seems like the easiest solution), checkmate checking,
+ * rule for saying where the king can really jump
+ */
 
 namespace Chess {
 
@@ -57,28 +66,52 @@ struct Move {
         Position from;
         Position to;
 
-        void apply(Board& board) const noexcept;
-        void reverse(Board& board) const noexcept;
+        Piece apply(Board& board) const noexcept;
+        void undo(Board& board, Piece eaten_piece) const noexcept;
 };
 
-// TODO Here we'll also need to look at the move history, for example controlling a pawn.
-using Rule = std::function<bool(Side on_turn, Board const& board, Move move)>;
+class CastlingMove {
+public:
+        explicit CastlingMove(Move move) noexcept;
+
+        Move rook_move() const noexcept;
+        Move king_move() const noexcept;
+        void apply(Board& board) const noexcept;
+        void undo(Board& board) const noexcept;
+
+private:
+        Move rook_move_;
+        Move king_move_;
+};
+
+class MoveHistory {
+public:
+        void add_move(Move move, Piece eaten_piece);
+        void add_castling_move(CastlingMove castling_move);
+        bool undo_move(Board& board) noexcept;
+        bool redo_move(Board& board) noexcept;
+        bool piece_was_moved(Position piece_position) const noexcept;
+
+private:
+        struct NormalMove {
+                Move move;
+                Piece eaten_piece;
+        };
+
+        using Action = std::variant<NormalMove, CastlingMove>;
+        using Actions = std::vector<Action>;
+
+        void add_action(Action action);
+
+        Actions actions_;
+        Actions::const_iterator last_action_ = actions_.cend();
+};
+
+using Rule = std::function<bool(Side on_turn, Board const& board,
+                                MoveHistory const& move_history, Move move)>;
 
 Board default_starting_board() noexcept;
 std::vector<Rule> default_rules();
-
-// TODO This class can have some more useful functions,
-// like checking if a piece was ever moved from a position
-class MoveHistory {
-public:
-        void add_move(Move move, Board& board);
-        bool undo_move(Board& board) noexcept;
-        bool redo_move(Board& board) noexcept;
-
-private:
-        std::vector<Move> moves_;
-        std::vector<Move>::const_iterator last_move_ = moves_.cend();
-};
 
 class Game {
 public:
@@ -90,6 +123,8 @@ public:
 
 private:
         void toggle_turn() noexcept;
+        void castling(Move move) noexcept;
+        void normal_move(Move move) noexcept;
 
         Board board_ = default_starting_board();
         std::vector<Rule> rules_ = default_rules();
