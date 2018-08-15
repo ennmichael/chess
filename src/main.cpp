@@ -8,8 +8,8 @@ namespace {
 unsigned constexpr window_width = Chess::field_width * Chess::board_size;
 unsigned constexpr window_height = Chess::field_height * Chess::board_size;
 
-template <class Redraw, class DispatchKey>
-void main_loop(Redraw const& redraw, DispatchKey const& dispatch_key)
+template <class Signals>
+void main_loop(Signals const& signals)
 {
         auto quit = false;
         while (!quit) {
@@ -20,7 +20,7 @@ void main_loop(Redraw const& redraw, DispatchKey const& dispatch_key)
                                         quit = true;
                                         break;
                                 case Sdl::Events::key_down:
-                                        dispatch_key(event->key.keysym.sym);
+                                        key_down(event->key.keysym.sym);
                                         break;
                         }
                 }
@@ -42,9 +42,17 @@ int main(int, char**)
         Chess::PieceSelector selector(Chess::Position {
                 .x = 0, .y = Chess::board_size - 1
         });
-        Chess::Game game;
 
-        auto const redraw = [&]
+        auto const game_over =
+        [](Side winner)
+        {
+        
+        };
+
+        Chess::Game game(game_over);
+
+        auto const redraw =
+        [&]
         {
                 Sdl::render_clear(*renderer);
                 Chess::draw_board(*renderer, *pieces, game.board());
@@ -52,7 +60,9 @@ int main(int, char**)
                 Sdl::render_present(*renderer);
         };
 
-        auto const dispatch_key = [&](Sdl::Keycode keycode) {
+        auto const key_down =
+        [&](Sdl::Keycode keycode)
+        {
                 // TODO Cancel selection with ESC
                 switch (keycode) {
                         case Sdl::Keycodes::left:
@@ -80,5 +90,5 @@ int main(int, char**)
                 }
         };
 
-        main_loop(redraw, dispatch_key);
+        main_loop(redraw, key_down);
 }

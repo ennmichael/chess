@@ -6,10 +6,8 @@
 
 /**
  * What's left:
- * Test castling
- * (this means that .applying a Move when src and dst are on the same side
- * should swap them - seems like the easiest solution), checkmate checking,
- * rule for saying where the king can really jump
+ * test checkmate checking, rule for saying where the king can really jump,
+ * mouse control, optionally highlighting valid fields with a macro
  */
 
 namespace Chess {
@@ -113,19 +111,25 @@ using Rule = std::function<bool(Side on_turn, Board const& board,
 Board default_starting_board() noexcept;
 std::vector<Rule> default_rules();
 
+using GameOver = void (*)(Side winner);
+
 class Game {
 public:
+        explicit Game(GameOver game_over) noexcept;
+
         bool try_move(Move move);
         void undo_move();
         void redo_move();
         Side on_turn() const noexcept;
         Board board() const noexcept;
+        Side winner() const noexcept;
 
 private:
         void toggle_turn() noexcept;
         void castling(Move move) noexcept;
         void normal_move(Move move) noexcept;
 
+        GameOver game_over_;
         Board board_ = default_starting_board();
         std::vector<Rule> rules_ = default_rules();
         MoveHistory move_history_;

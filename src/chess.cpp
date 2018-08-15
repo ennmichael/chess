@@ -139,6 +139,21 @@ Rule movement_rule(Piece::Kind piece_kind, MovementPattern pattern)
         );
 }
 
+bool field_under_attack(std::vector<Rule> const& rules,
+                        Board const& board,
+                        Position field_position)
+{
+        for (int x = 0; x < board_size; ++x) {
+                for (int y = 0; y < board_size; ++y) {
+                        Position const pos {x, y};
+                        Move const move {.from = pos, .to = field_position};
+                        if (move_is_valid(move))
+                                return true;
+                }
+        }
+        return false;
+}
+
 Rule king_movement_rule()
 {
         return movement_rule(Piece::Kind::king, star_pattern(1));
@@ -261,6 +276,51 @@ Rule castling_rule()
                         }
                 }
         );
+}
+
+std::optional<Position> find_piece(Board const& board, Piece piece) noexcept
+{
+        for (int x = 0; x < board_size; ++x) {
+                for (int y = 0; y < board_size; ++y) {
+                        if (board[y][x] == piece)
+                                return {x, y};
+                }
+        }
+}
+
+// TODO Refactor: factor out the nested loop, it's bloody annoying
+
+bool piece_trapped(std::vector<Rule> const& rules,
+                   Board const& board,
+                   Position piece_position) noexcept
+{
+        for (int x = 0; x < board_size; ++x) {
+                for (int y = 0; y < board_size; ++y) {
+                        Position const pos {x, y};
+                        Move const move {.from = piece_position, .to = pos};
+                        if (move_is_valid(move))
+                                return false;
+                }
+        }
+        return true;
+}
+
+Side winner(std::vector<Rule> const& rules, Board const& board) noexcept
+{
+        auto const side_won =
+        [&](Side side)
+        {
+                Piece const king {.kind = Piece::Kind::king, .side = side};
+                std::optional king_position = find_piece(board, king);
+                assert(king_position);
+                return piece_trapped(rules, board, *king_position);
+        };
+
+        if (side_won(Side::light))
+                return Side::light;
+        if (side_won(Side::dark))
+                return Side::dark;
+        return Side::none;
 }
 
 }
@@ -470,7 +530,7 @@ Board default_starting_board() noexcept
                         .kind = Piece::Kind::rook,
                         .side = side
                 };
-                /*board[y][left_knight_x] = board[y][right_knight_x] = Piece {
+                board[y][left_knight_x] = board[y][right_knight_x] = Piece {
                         .kind = Piece::Kind::knight,
                         .side = side
                 };
@@ -481,7 +541,7 @@ Board default_starting_board() noexcept
                 board[y][queen_x] = Piece {
                         .kind = Piece::Kind::queen,
                         .side = side
-                };*/
+                };
                 board[y][king_x] = Piece {
                         .kind = Piece::Kind::king,
                         .side = side
@@ -508,6 +568,10 @@ std::vector<Rule> default_rules()
         };
 }
 
+Game::Game(GameOver game_over) noexcept
+        : game_over_(std::move(game_over))
+{}
+
 bool Game::try_move(Move move)
 {
         if (move_is_valid(rules_, on_turn_, board_, move_history_, move)) {
@@ -517,7 +581,13 @@ bool Game::try_move(Move move)
                         castling(move);
                 else
                         normal_move(move);
-                toggle_turn();
+                Side const winner = winner(rules_, board_);
+                if (winner != Side::none) {
+                        on_turn_ = Side::none;
+                        game_over_(winner);
+                } else {
+                        toggle_turn();
+                }
                 return true;
         }
         return false;
@@ -543,6 +613,11 @@ Side Game::on_turn() const noexcept
 Board Game::board() const noexcept
 {
         return board_;
+}
+
+Side Game::winner() const noexcept
+{
+        return winner_;
 }
 
 void Game::toggle_turn() noexcept
